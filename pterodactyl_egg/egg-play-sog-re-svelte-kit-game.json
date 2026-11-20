@@ -1,0 +1,114 @@
+{
+  "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PLAY.SOG.RE",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": null
+  },
+  "exported_at": "2026-11-20T20:25:00+00:00",
+  "name": "Play.Sog.Re SvelteKit Game",
+  "author": "dev@play.sog.re",
+  "description": "Egg universel et 100% autonome pour déployer les jeux SvelteKit (Movie Selector, SogQuiz, TCG, etc.) sur Pterodactyl. Le container génère sa propre clé SSH Ed25519 nommée d'après l'ID du jeu pour GitHub, clone le repo privé, configure le .env, installe les dépendances et démarre.",
+  "features": null,
+  "docker_images": {
+    "Node.js 22 (Recommandé)": "ghcr.io/parkervcp/yolks:nodejs_22",
+    "Node.js 20": "ghcr.io/parkervcp/yolks:nodejs_20"
+  },
+  "file_denylist": [],
+  "startup": "mkdir -p /home/container/.ssh && chmod 700 /home/container/.ssh && ssh-keyscan -H github.com > /home/container/.ssh/known_hosts 2>/dev/null; KEY_PATH=$(ls /home/container/.ssh/id_ed25519_* 2>/dev/null | grep -v '\\.pub$' | head -n 1); if [ -n \"$KEY_PATH\" ]; then printf '#!/bin/sh\\nexec ssh -l git -F /dev/null -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes -o UserKnownHostsFile=/home/container/.ssh/known_hosts -i \"%s\" \"$@\"\\n' \"$KEY_PATH\" > /tmp/git-ssh.sh && chmod +x /tmp/git-ssh.sh && export GIT_SSH=\"/tmp/git-ssh.sh\" && export GIT_SSH_COMMAND=\"/tmp/git-ssh.sh\"; fi; if [ ! -d \".git\" ] && [ -n \"${GIT_REPO}\" ]; then echo \"📥 Tentative de clonage du dépôt ${GIT_REPO}...\"; git clone -b \"${GIT_BRANCH:-master}\" \"${GIT_REPO}\" /tmp/repo_clone && cp -rn /tmp/repo_clone/. . && cp -r /tmp/repo_clone/.git . && rm -rf /tmp/repo_clone; if [ ! -d \".git\" ]; then echo \"❌ Échec du clonage.\"; exit 1; fi; echo \"✅ Dépôt cloné avec succès !\"; fi; touch .env; set_env() { key=\"$1\"; val=\"$2\"; if [ -n \"$val\" ]; then if grep -q \"^${key}=\" .env 2>/dev/null; then sed -i \"s|^${key}=.*|${key}=\\\"${val}\\\"|\" .env; else echo \"${key}=\\\"${val}\\\"\" >> .env; fi; fi; }; set_env \"PUBLIC_PLAY_SOG_MODE\" \"${PUBLIC_PLAY_SOG_MODE}\"; set_env \"PUBLIC_PLAY_SOG_URL\" \"${PUBLIC_PLAY_SOG_URL}\"; set_env \"PUBLIC_PLAY_SOG_API_URL\" \"${PUBLIC_PLAY_SOG_API_URL}\"; set_env \"PUBLIC_APP_ID\" \"${PUBLIC_APP_ID}\"; set_env \"PRIVATE_GAME_SYSTEM_API_SECRET\" \"${PRIVATE_GAME_SYSTEM_API_SECRET}\"; set_env \"PRIVATE_TMDB_API_KEY\" \"${PRIVATE_TMDB_API_KEY}\"; set_env \"PORT\" \"${SERVER_PORT}\"; set_env \"HOST\" \"0.0.0.0\"; set_env \"PROTOCOL_HEADER\" \"x-forwarded-proto\"; set_env \"HOST_HEADER\" \"x-forwarded-host\"; if [ ! -d \"build\" ] || [ \"${AUTO_UPDATE}\" = \"1\" ]; then echo \"🔨 Installation & Compilation SvelteKit...\"; if [ -d \".git\" ]; then git fetch origin ${GIT_BRANCH:-master} 2>/dev/null || true; git reset --hard origin/${GIT_BRANCH:-master} 2>/dev/null || true; fi; npm ci --prefer-offline --no-audit --no-fund || npm install --no-audit --no-fund; NODE_OPTIONS=\"--max-old-space-size=1024\" npm run build; fi; PORT=${SERVER_PORT} HOST=0.0.0.0 node server.js",
+  "config": {
+    "files": "{}",
+    "startup": "{\r\n    \"done\": \"Listening on\"\r\n}",
+    "logs": "{}",
+    "stop": "^C"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/ash\r\necho \"==========================================================\"\r\necho \"✅ Initialisation de l'espace de travail du container\"\r\necho \"==========================================================\"\r\nmkdir -p /mnt/server/data\r\necho \"Le container configurera sa clé SSH et son environnement au premier démarrage.\"",
+      "container": "alpine:3.20",
+      "entrypoint": "ash"
+    }
+  },
+  "variables": [
+    {
+      "name": "Identifiant App Play.Sog.Re (PUBLIC_APP_ID)",
+      "description": "Identifiant unique de l'application (ex: psr-movie-selector, psr-sogquiz, psr-tcg). Utilisé aussi pour nommer la clé SSH.",
+      "env_variable": "PUBLIC_APP_ID",
+      "default_value": "psr-movie-selector",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:40"
+    },
+    {
+      "name": "Dépôt Git (SSH)",
+      "description": "URL SSH du dépôt GitHub privé (ex: git@github.com:play-sog-re/PSR-movie-selector.git)",
+      "env_variable": "GIT_REPO",
+      "default_value": "git@github.com:play-sog-re/PSR-movie-selector.git",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string"
+    },
+    {
+      "name": "Branche Git",
+      "description": "Branche Git à cloner et déployer (master, main, dev).",
+      "env_variable": "GIT_BRANCH",
+      "default_value": "master",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|max:40"
+    },
+    {
+      "name": "Mise à jour automatique au démarrage",
+      "description": "Si activé (1), exécute git fetch, reset --hard, npm ci et build à chaque redémarrage.",
+      "env_variable": "AUTO_UPDATE",
+      "default_value": "0",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|boolean"
+    },
+    {
+      "name": "Mode API Play.Sog.Re",
+      "description": "Mode de fonctionnement de l'API : live (production), dev (simulation locale) ou fake_live.",
+      "env_variable": "PUBLIC_PLAY_SOG_MODE",
+      "default_value": "live",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string|in:live,dev,fake_live"
+    },
+    {
+      "name": "Secret API Système (PRIVATE_GAME_SYSTEM_API_SECRET)",
+      "description": "Clé secrète serveur-à-serveur pour les transactions de Fragments et la vérification des tokens.",
+      "env_variable": "PRIVATE_GAME_SYSTEM_API_SECRET",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string"
+    },
+    {
+      "name": "URL Portail Play.Sog.Re",
+      "description": "URL publique du portail play.sog.re.",
+      "env_variable": "PUBLIC_PLAY_SOG_URL",
+      "default_value": "https://play.sog.re",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string"
+    },
+    {
+      "name": "URL API v1 Play.Sog.Re",
+      "description": "URL de base de l'API Unifiée v1.",
+      "env_variable": "PUBLIC_PLAY_SOG_API_URL",
+      "default_value": "https://play.sog.re/api/v1",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string"
+    },
+    {
+      "name": "Clé API TMDB (Optionnel)",
+      "description": "Clé API v3 The Movie Database (nécessaire pour Movie Selector).",
+      "env_variable": "PRIVATE_TMDB_API_KEY",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "nullable|string"
+    }
+  ]
+}
