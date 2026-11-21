@@ -14,7 +14,7 @@
     "Node.js 20": "ghcr.io/parkervcp/yolks:nodejs_20"
   },
   "file_denylist": [],
-  "startup": "if [ -d .deployer/.git ]; then git -C .deployer pull --ff-only --quiet 2>/dev/null || true; else git clone --depth=1 --branch=\"${DEPLOYER_BRANCH:-master}\" \"${DEPLOYER_REPO:-https://github.com/play-sog-re/PSR-Deploy-documentation.git}\" .deployer 2>/dev/null || git clone --depth=1 \"${DEPLOYER_REPO:-https://github.com/play-sog-re/PSR-Deploy-documentation.git}\" .deployer; fi; bash .deployer/deployer/run.sh",
+  "startup": "if [ -d .deployer/.git ]; then git -C .deployer pull --ff-only --quiet 2>/dev/null || true; else git clone --depth=1 --branch=\"${DEPLOYER_BRANCH:-master}\" \"${DEPLOYER_REPO:-https://github.com/play-sog-re/PSR-deploy.git}\" .deployer 2>/dev/null || git clone --depth=1 \"${DEPLOYER_REPO:-https://github.com/play-sog-re/PSR-deploy.git}\" .deployer; fi; bash .deployer/deployer/run.sh",
   "config": {
     "files": "{}",
     "startup": "{\r\n    \"done\": \"Listening on\"\r\n}",
@@ -33,7 +33,7 @@
       "name": "Dépôt Git du Déployeur",
       "description": "URL publique du dépôt contenant l'outil de déploiement universel Play.Sog.Re.",
       "env_variable": "DEPLOYER_REPO",
-      "default_value": "https://github.com/play-sog-re/PSR-Deploy-documentation.git",
+      "default_value": "https://github.com/play-sog-re/PSR-deploy.git",
       "user_viewable": true,
       "user_editable": true,
       "rules": "required|string"
