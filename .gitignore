@@ -1,0 +1,39 @@
+# Secrets et certificats de sécurité (JAMAIS dans le repo public)
+data/ssl/*.pem
+data/ssl/*.key
+data/ssl/*.crt
+*.pem
+*.key
+*.crt
+.env
+.env.*
+!.env.example
+!.env.test
+
+# SSH
+.ssh/
+id_ed25519*
+id_rsa*
+known_hosts*
+
+# Node / SvelteKit / Build
+node_modules/
+build/
+.svelte-kit/
+dist/
+.deploy.lock
+
+# Outils de déploiement clonés localement en conteneur
+.deployer/
+.git-deployer/
+
+# Logs & temporaires
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+/tmp/
+
+# IDE & OS
+.DS_Store
+Thumbs.db

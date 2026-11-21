@@ -1,31 +1,51 @@
 # 🥚 Guide de Déploiement Pterodactyl — Jeux SvelteKit Play.Sog.Re
 
-Ce guide détaille pas à pas la configuration complète dans **Pterodactyl** pour déployer de façon **100% autonome** vos applications SvelteKit basées sur le devkit (`PSR-movie-selector`, `PSR-SogQuiz`, `PSR-tcg`, etc.).
+Ce guide détaille pas à pas la configuration complète dans **Pterodactyl** pour déployer de façon **100% autonome** vos applications SvelteKit basées sur le devkit (`PSR-movie-selector`, `PSR-SogQuiz`, `PSR-TCG`, `PSR-Slot`, etc.).
+
+---
+
+## 🏗️ Architecture du Déploiement
+
+Le déploiement repose sur un modèle en deux couches :
+1. **L'Egg Pterodactyl universel ([`egg-play-sog-re-svelte-kit-game.json`](./egg-play-sog-re-svelte-kit-game.json))** : Un chargeur (bootstrapper) ultra-léger et stable qui n'a plus besoin d'être modifié ou réimporté à chaque évolution.
+2. **L'Application de Déploiement (`PSR-Deploy-documentation/deployer`)** : Moteur Node.js autonome téléchargé automatiquement depuis ce dépôt Git public. Il gère :
+   - L'authentification Git sécurisée par **Token GitHub (Personal Access Token)** sans configuration SSH.
+   - Le clonage / mise à jour atomique du dépôt privé du jeu.
+   - La configuration synchronisée du fichier `.env`.
+   - La détection du certificat SSL Cloudflare Origin ou du mode HTTP.
+   - L'installation des dépendances (`npm ci`) et la compilation SvelteKit (`npm run build`).
+   - L'exécution surveillée du serveur avec gestion gracieuse de l'arrêt (`SIGINT`/`SIGTERM`).
 
 ---
 
 ## 📋 Prérequis
 
 1. Un accès administrateur à votre panel Pterodactyl (`https://panel.votre-domaine.com/admin`).
-2. Le fichier Egg : [`pterodactyl/egg-play-sog-re-svelte-kit-game.json`](file:///c:/Users/tirio/PhpstormProjects/PSR-movie-selector/pterodactyl/egg-play-sog-re-svelte-kit-game.json).
-3. Une paire de clés SSH de déploiement (Deploy Key) pour cloner votre dépôt GitHub privé.
+2. Le fichier Egg : [`egg-play-sog-re-svelte-kit-game.json`](./egg-play-sog-re-svelte-kit-game.json).
+3. L'URL HTTPS de votre dépôt GitHub privé (ex: `https://github.com/play-sog-re/PSR-movie-selector.git`).
+4. Un **Token GitHub** (Personal Access Token) disposant des droits de lecture sur les dépôts de l'organisation.
 
 ---
 
-## 🔑 Étape 1 : Préparer la Deploy Key GitHub
+## 🔑 Étape 1 : Générer un Token d'accès GitHub (PAT)
 
-Puisque les dépôts sont privés, le container Pterodactyl a besoin d'une clé SSH pour cloner le code :
+Puisque les dépôts de jeux sont privés, le conteneur Pterodactyl a besoin d'un token d'accès pour cloner le code source :
 
-1. Sur votre machine ou serveur, générez une clé dédiée si vous n'en avez pas :
-   ```bash
-   ssh-keygen -t ed25519 -C "pterodactyl-deploy" -f id_deploy
-   ```
-2. Rendez-vous sur votre dépôt GitHub privé (ex: `https://github.com/play-sog-re/PSR-movie-selector`).
-3. Allez dans **Settings** > **Deploy keys** > **Add deploy key**.
-4. Titre : `Pterodactyl Container`
-5. Collez le contenu de la clé publique `id_deploy.pub`.
-6. Laissez la case *Allow write access* décochée et validez.
-7. Gardez sous la main le contenu de la **clé privée** `id_deploy` (commençant par `-----BEGIN OPENSSH PRIVATE KEY-----`), vous en aurez besoin à l'étape 4.
+1. Rendez-vous sur votre compte GitHub > Cliquez sur votre avatar en haut à droite > **Settings**.
+2. Dans le menu de gauche tout en bas, cliquez sur **Developer Settings** > **Personal access tokens** :
+   - **Option recommandée (Fine-grained token) :**
+     - Cliquez sur **Fine-grained tokens** > **Generate new token**.
+     - **Token name :** `Pterodactyl Deployer`
+     - **Resource owner :** Sélectionnez votre organisation `play-sog-re`.
+     - **Repository access :** Sélectionnez *Only select repositories* (ou *All repositories*).
+     - **Permissions :** Dans *Repository permissions*, cochez **Contents: Read-only**.
+     - Cliquez sur **Generate token**.
+   - **Option alternative (Token Classic) :**
+     - Cliquez sur **Tokens (classic)** > **Generate new token (classic)**.
+     - Note : `Pterodactyl Deployer`.
+     - Cochez la case **`repo`** (accès complet aux dépôts privés).
+     - Cliquez sur **Generate token**.
+3. Copiez le token généré (`github_pat_...` ou `ghp_...`). Vous le renseignerez dans la variable **`GIT_TOKEN`**.
 
 ---
 
@@ -42,7 +62,7 @@ Puisque les dépôts sont privés, le container Pterodactyl a besoin d'une clé 
 
 ---
 
-## 🌐 Étape 3 : Vérifier / Créer une allocation de port (Allocation)
+## 🌐 Étape 3 : Créer une Allocation de Port (Allocation)
 
 Pterodactyl a besoin d'un port réseau libre pour exposer votre application SvelteKit :
 
@@ -57,12 +77,12 @@ Pterodactyl a besoin d'un port réseau libre pour exposer votre application Svel
 
 ---
 
-## 🖥️ Étape 4 : Créer le Serveur (Container)
+## 🖥️ Étape 4 : Créer le Serveur (Conteneur)
 
 Toujours dans la section Admin, allez dans **Servers** > **Create New** :
 
 ### 1. Core Details
-- **Server Name** : `Movie Selector` (ou `SogQuiz`, `TCG`...).
+- **Server Name** : `Movie Selector` (ou `SogQuiz`, `TCG`, `Slot`...).
 - **Server Owner** : Sélectionnez votre compte utilisateur.
 
 ### 2. Allocation Management
@@ -71,13 +91,13 @@ Toujours dans la section Admin, allez dans **Servers** > **Create New** :
   *(Ce port sera injecté automatiquement dans l'application comme `${SERVER_PORT}`)*.
 
 ### 3. Application Feature Limits
-- Laissez les valeurs par défaut (généralement 0 base de données, 0 backup si non nécessaire).
+- Laissez les valeurs par défaut (0 base de données, 0 backup si non nécessaire).
 
 ### 4. Resource Management (Ressources recommandées)
 - **CPU Limit** : `100%` (ou `200%` pour un build rapide).
-- **Memory Limit** : `1024 MB` (ou `2048 MB` recommandé pour être très à l'aise pendant la compilation SvelteKit).
-- **Swap Limit** : `512 MB` (ou `1024 MB` pour avoir une marge de sécurité mémoire).
-- **Disk Space** : `2048 MB` (2 Go suffisent largement pour Node, node_modules et le build).
+- **Memory Limit** : `2048 MB` (Recommandé pour être à l'aise pendant la compilation SvelteKit).
+- **Swap Limit** : `1024 MB` (Marge de sécurité mémoire).
+- **Disk Space** : `4096 MB` (Suffisant pour Node, les dépendances node_modules et le build).
 
 ### 5. Nest Configuration
 - **Nest** : Sélectionnez le Nest où vous avez importé l'Egg.
@@ -85,20 +105,21 @@ Toujours dans la section Admin, allez dans **Servers** > **Create New** :
 - **Docker Image** : `ghcr.io/parkervcp/yolks:nodejs_22` (par défaut).
 
 ### 6. Variables d'Environnement (Service Variables)
-Renseignez les champs :
 
 | Variable | Description | Exemple |
 | :--- | :--- | :--- |
-| **Dépôt Git** (`GIT_REPO`) | URL SSH de votre dépôt privé | `git@github.com:play-sog-re/PSR-movie-selector.git` |
-| **Branche Git** (`GIT_BRANCH`) | Branche à déployer | `master` |
-| **Clé SSH Privée** (`GIT_SSH_KEY`) | Votre clé privée SSH complète générée à l'étape 1 | `-----BEGIN OPENSSH PRIVATE KEY----- ... -----END OPENSSH PRIVATE KEY-----` |
+| **Dépôt Git du Déployeur** (`DEPLOYER_REPO`) | Dépôt public de l'outil de déploiement | `https://github.com/play-sog-re/PSR-Deploy-documentation.git` |
+| **Branche du Déployeur** (`DEPLOYER_BRANCH`) | Branche du déployeur | `master` |
+| **Identifiant App** (`PUBLIC_APP_ID`) | Identifiant unique de l'application | `psr-movie-selector` *(ou `psr-sogquiz`)* |
+| **Dépôt Git du Jeu** (`GIT_REPO`) | URL HTTPS de votre dépôt privé | `https://github.com/play-sog-re/PSR-movie-selector.git` |
+| **Token GitHub** (`GIT_TOKEN`) | Token d'accès généré à l'étape 1 | `github_pat_11A...` *(ou `ghp_...`)* |
+| **Branche Git du Jeu** (`GIT_BRANCH`) | Branche à déployer | `master` |
 | **Auto Update** (`AUTO_UPDATE`) | Mettre à jour et recompiler à chaque reboot | `0` (Manuel) ou `1` (Automatique) |
-| **Mode API** (`PUBLIC_PLAY_SOG_MODE`) | Mode d'exécution de l'API | `live` (ou `dev` pour test hors ligne) |
-| **Identifiant App** (`PUBLIC_APP_ID`) | Identifiant de l'application sur play.sog.re | `psr-movie-selector` (ou `psr-sogquiz`) |
-| **Secret API Système** (`PRIVATE_GAME_SYSTEM_API_SECRET`) | Clé secrète de communication backend | `7c3e080530898de6e346e9440eb1191...` |
+| **Mode API** (`PUBLIC_PLAY_SOG_MODE`) | Mode d'exécution de l'API | `live` *(ou `dev` pour test hors-ligne)* |
 | **URL Portail** (`PUBLIC_PLAY_SOG_URL`) | URL du portail officiel | `https://play.sog.re` |
 | **URL API v1** (`PUBLIC_PLAY_SOG_API_URL`) | URL de l'API v1 | `https://play.sog.re/api/v1` |
-| **Clé API TMDB** (`PRIVATE_TMDB_API_KEY`) | Clé The Movie Database (Movie Selector) | `42ec70fc7ba828df0f35713620871e7f` |
+| **Secret API Système** (`PRIVATE_GAME_SYSTEM_API_SECRET`) | Clé secrète serveur-à-serveur | `votre_secret_api_systeme` |
+| **Clé API TMDB** (`PRIVATE_TMDB_API_KEY`) | Clé TMDB (si Movie Selector) | `votre_cle_tmdb` *(Optionnel)* |
 
 7. Cliquez sur le bouton vert **Create Server** en bas à droite.
 
@@ -106,27 +127,39 @@ Renseignez les champs :
 
 ## 🚀 Étape 5 : Premier Démarrage & Suivi des Logs
 
-1. Rendez-vous sur la vue utilisateur de Pterodactyl : `https://panel.votre-domaine.com/server/<ID>`.
-2. Le statut affiche d'abord **Installing** :
-   - Pterodactyl lance le container d'installation Alpine.
-   - Il configure la clé SSH, clone le repo GitHub privé, installe les modules npm (`npm ci`), génère le fichier `.env` avec vos variables et compile l'application (`npm run build`).
-3. Une fois l'installation terminée (1 à 2 minutes), le serveur passe en **Offline**.
-4. Cliquez sur **Start** :
-   - La console affiche : `Listening on 0.0.0.0:3005`.
-   - Le statut passe au vert : **Running**.
-
-Votre jeu est immédiatement en ligne et accessible sur `http://IP_DE_VOTRE_NODE:PORT` !
+1. Rendez-vous sur la vue console du serveur Pterodactyl : `https://panel.votre-domaine.com/server/<ID>`.
+2. Cliquez sur le bouton **Start**.
+3. Le conteneur télécharge automatiquement l'application de déploiement Play.Sog.Re, s'authentifie auprès de GitHub via votre token, clone le dépôt privé, installe les dépendances npm (`npm ci`), compile SvelteKit et démarre l'application.
+4. Le token est **automatiquement masqué** dans la console pour garantir la confidentialité (`https://***@github.com/...`).
+5. La console confirme :
+   ```text
+   Listening on http://0.0.0.0:3005
+   🌐 Serveur HTTP standard démarré sur http://0.0.0.0:3005
+   ```
+   *(Ou en HTTPS si les certificats Cloudflare sont déposés)*.
 
 ---
 
-## 🔄 Étape 6 : Comment mettre à jour le jeu lors d'un nouveau commit ?
+## 🔒 Étape 6 : Configuration SSL Cloudflare Origin (Optionnel mais recommandé)
 
-Vous avez deux méthodes simples :
+Si vous utilisez Cloudflare en mode Full (Strict) :
 
-### Méthode A : Avec la variable `AUTO_UPDATE=1` (Recommandé)
-1. Dans l'onglet **Startup** du serveur Pterodactyl, réglez `AUTO_UPDATE` sur `1`.
-2. Dès que vous avez poussé du nouveau code sur GitHub, cliquez simplement sur le bouton **Restart** dans la console Pterodactyl.
-3. Le container va automatiquement faire `git fetch`, `git reset --hard`, `npm ci`, recompiler et redémarrer la nouvelle version.
+1. Dans Pterodactyl, ouvrez le **File Manager**.
+2. Allez dans `data/ssl/` (le dossier est créé automatiquement).
+3. Déposez vos deux fichiers :
+   - `cert.pem` : Le certificat Cloudflare Origin.
+   - `key.pem` : La clé privée Cloudflare Origin.
+4. Redémarrez le serveur : la console affichera :
+   ```text
+   🔒 Certificats Cloudflare Origin détectés et valides.
+   Listening on https://0.0.0.0:3005
+   🔒 Serveur HTTPS démarré avec succès sur https://0.0.0.0:3005
+   ```
 
-### Méthode B : Réinstallation propre (Reinstall)
-Dans les paramètres du serveur (**Settings** dans le panel utilisateur), vous pouvez cliquer sur **Reinstall Server** pour forcer une réinstallation complète à partir de zéro sans perdre le dossier ``.
+---
+
+## 🔄 Étape 7 : Mises à Jour Automatiques
+
+1. Dans l'onglet **Startup** du serveur Pterodactyl, passez **`AUTO_UPDATE`** à **`1`**.
+2. Dès que vous poussez un commit sur GitHub, cliquez simplement sur **Restart**.
+3. Le conteneur télécharge automatiquement le nouveau code via votre token, met à jour les dépendances, recompile SvelteKit et relance le service sans intervention manuelle.
